@@ -7,7 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
     <style>
         body { font-family: 'Nanum Gothic', sans-serif; touch-action: manipulation; }
@@ -328,11 +328,24 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let sb = null;
 
 function initSupabase() {
-    if (SUPABASE_URL.includes('your-project-id')) return false;
+    if (SUPABASE_URL.includes('your-project-id')) {
+        console.warn('[DB] Supabase URL 미설정');
+        return false;
+    }
     try {
         sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        console.log('[DB] Supabase 클라이언트 생성 성공');
+        // 연결 테스트
+        sb.from('game_scores').select('count', {count:'exact', head:true})
+          .then(({count, error}) => {
+              if (error) console.error('[DB] 연결 테스트 실패:', error.message);
+              else console.log('[DB] 연결 테스트 성공! 현재', count, '건');
+          });
         return true;
-    } catch(e) { return false; }
+    } catch(e) {
+        console.error('[DB] 클라이언트 생성 실패:', e);
+        return false;
+    }
 }
 
 // ===== 기본 단어 =====
