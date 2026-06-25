@@ -456,13 +456,20 @@ function playGameOverSound(){
 // ===== Supabase DB 함수 =====
 async function saveScore(studentId, score, combo) {
     if (!sb) throw new Error('Supabase 미설정');
-    const { data: existing } = await sb.from('game_scores').select('*').eq('student_id', studentId).single();
+    // upsert: 있으면 업데이트, 없으면 삽입 (1회 호출로 해결!)
+    const { data: existing, error: selErr } = await sb
+        .from('game_scores')
+        .select('best_score, best_combo, play_count')
+        .eq('student_id', studentId)
+        .maybeSingle();
+    if (selErr) throw new Error('조회: ' + selErr.message);
+
     if (!existing) {
         const { error } = await sb.from('game_scores').insert({
             student_id: studentId, best_score: score, best_combo: combo,
             play_count: 1, updated_at: new Date().toISOString()
         });
-        if (error) throw error;
+        if (error) throw new Error('저장: ' + error.message);
     } else {
         const { error } = await sb.from('game_scores').update({
             best_score: Math.max(existing.best_score || 0, score),
@@ -470,7 +477,7 @@ async function saveScore(studentId, score, combo) {
             play_count: (existing.play_count || 0) + 1,
             updated_at: new Date().toISOString()
         }).eq('student_id', studentId);
-        if (error) throw error;
+        if (error) throw new Error('갱신: ' + error.message);
     }
 }
 
@@ -827,7 +834,7 @@ async function gameOver(){
             // 저장 후 랭킹 실시간 갱신
             await refreshRankingList(state.score);
         } catch(e) {
-            statusEl.textContent = '⚠️ 저장 실패 (DB 설정 확인)';
+            statusEl.textContent = '⚠️ 저장 실패: ' + e.message;
             statusEl.className = 'text-xs mt-2 text-amber-400';
         }
     }
@@ -879,6 +886,9 @@ document.getElementById('btn-show-guide').onclick=()=>document.getElementById('g
 document.getElementById('btn-close-guide').onclick=()=>document.getElementById('guide-modal').classList.add('hidden');
 
 window.addEventListener('load',()=>{
+    if (location.protocol === 'file:') {
+        console.warn('file:// 프로토콜은 Supabase 연결이 차단될 수 있습니다. https:// (GitHub Pages)에서 실행하세요.');
+    }
     initSupabase();
     loadWordsFromStorage();
     updateHeartsUI();
